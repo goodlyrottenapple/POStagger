@@ -3,9 +3,11 @@
 module Core where
 
 import Data.List (intercalate)
-import qualified Data.Map.Strict as M
 import Data.List.Split (splitOn)
+import qualified Data.Map.Strict as M
+import Debug.Trace (trace)
 
+debug = flip trace
 
 type Word = String
 type Tag = String

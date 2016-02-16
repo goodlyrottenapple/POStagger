@@ -1,21 +1,25 @@
 module Alg where
 import Core
 
-import Data.List (intercalate, sortBy)
+import Data.Char (toLower)
+import Data.List (intercalate)
 import qualified Data.Map.Strict as M
 import Control.Monad (liftM2)
-import Data.Char (toLower)
-import Data.Ord (comparing)
+
 
 prod :: [a] -> [b] -> [(a, b)]
 prod = liftM2 (,)
 
+
 lowerCase = map toLower
 
 
+-- generates a map of tags with the number of times they occur in a sentence
 tagOccsSentence :: Sentence -> TagCountMap
 tagOccsSentence = foldl (\m (w,list) -> foldl (\m' t -> M.insertWith (+) t 1 m') m list) M.empty
 
+-- generates a map of tags with the number of times they occur in a corpus
+-- calls tagOccsSentence for each sentence and merges the resulting maps
 genTagOccsMap :: [Sentence] -> TagCountMap
 genTagOccsMap = foldl (\m s -> M.unionWith (+) m (tagOccsSentence s)) M.empty
 
@@ -27,6 +31,7 @@ tagTagOccsSentence [(_,t1),(_,t2)] = foldl (\m pair -> M.insertWith (+) pair 1 m
 tagTagOccsSentence (a:b:xs) = foldl (\m pair -> M.insertWith (+) pair 1 m) (tagTagOccsSentence (b:xs)) (tags a `prod` tags b)
 tagTagOccsSentence _ = M.empty
 
+-- calls tagTagOccsSentence for each sentence from the corpus and merges the resulting maps
 genTagTagOccsMap :: [Sentence] -> TagTagCountMap
 genTagTagOccsMap = foldl (\m s -> M.unionWith (+) m (tagTagOccsSentence s)) M.empty
 
@@ -35,6 +40,7 @@ genTagTagOccsMap = foldl (\m s -> M.unionWith (+) m (tagTagOccsSentence s)) M.em
 wordTagOccsSentence :: Sentence -> WordTagCountMap
 wordTagOccsSentence = foldl (\m (w,list) -> foldl (\m' t -> M.insertWith (+) (lowerCase w,t) 1 m') m list) M.empty
 
+-- calls wordTagOccsSentence for each sentence and merges the resulting maps
 genWordTagOccsMap :: [Sentence] -> WordTagCountMap
 genWordTagOccsMap = foldl (\m s -> M.unionWith (+) m (wordTagOccsSentence s)) M.empty
 
@@ -69,7 +75,6 @@ initBackPtr tags = M.fromList [(t, []) | t <- tags]
 viterbi' :: M.Map Tag Float -> M.Map Tag [Tag] -> WordTagProb -> TagTagProb -> [Core.Word] -> [Tag]
 viterbi' score backPtr pWT pTT [] = reverse $ backPtr M.! maxK
     where maxK = fst $ M.foldrWithKey (\k v (t, s) -> if v >= s then (k, v) else (t, s)) ("", log(0/1)) score
-     -- findMax = fst . last . sortBy (comparing snd) . M.toList
 viterbi' score backPtr pWT pTT (w:ords) = viterbi' score' backPtr' pWT pTT ords 
 {-  `debug` ( w  ++ "\n\n" 
         ++ (fst . last . sortBy (comparing snd) . M.toList $ score') ++ "\n\n"
@@ -79,10 +84,9 @@ viterbi' score backPtr pWT pTT (w:ords) = viterbi' score' backPtr' pWT pTT ords
         "\n\n===============================\n\n")-}
     where 
         score' = M.mapWithKey (\i _ -> snd $ maxK i) score
-        backPtr' = M.mapWithKey (\i _ -> let prev = fst $ maxK i in prev:(backPtr M.! prev)) backPtr -- M.fromList [(i, (fst $ maxK i):(backPtr M.! (fst $ maxK i))) | i <- M.keys score]
+        backPtr' = M.mapWithKey (\i _ -> let prev = fst $ maxK i in prev:(backPtr M.! prev)) backPtr
         maxK :: Tag -> (Tag, Float)
         maxK i = M.foldrWithKey (\k v (t, s) -> let s' = v + pTT (i, k) + pWT (w, i) in if s' >= s then (k, s') else (t, s)) ("", log(0/1)) score
-            --last $ sortBy (comparing snd) [(k, score M.! k + pTT (i, k) + pWT (w, i)) | k <- M.keys score]
 
 viterbi :: [Tag] -> WordTagProb -> TagTagProb -> [Core.Word] -> [Tag]
 viterbi _ _ _ [] = []
